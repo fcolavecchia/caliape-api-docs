@@ -5,13 +5,8 @@ Este repositorio publica la documentación de la Enterprise API en GitHub Pages.
 ## Estructura
 
 - `index.html`: landing pública.
-<<<<<<< codex/implement-documentation-for-enterprise-api-i5b2kx
 - `entreprise-api-v1.yaml`: especificación OpenAPI (sin credenciales).
 - `docs/`: Swagger UI configurado para cargar `../entreprise-api-v1.yaml`.
-=======
-- `enterprise-api-v1.yaml`: especificación enterprise-api-v1 (sin credenciales).
-- `swagger/`: Swagger UI configurado para cargar `../enterprise-api-v1.yaml`.
->>>>>>> main
 
 > Nota: actualmente Swagger UI se carga desde CDN para simplificar el despliegue. Si necesitás
 > servir los assets locales, descargá los archivos `dist` de Swagger UI y reemplazá los links
