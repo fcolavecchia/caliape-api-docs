@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Caliape Enterprise API</title>
+    <style>
+      :root {
+        color-scheme: light;
+        font-family: "Inter", "Segoe UI", system-ui, -apple-system, sans-serif;
+        background: #f7f9fc;
+        color: #0f172a;
+      }
+      body {
+        margin: 0;
+        padding: 0;
+      }
+      main {
+        max-width: 880px;
+        margin: 0 auto;
+        padding: 72px 24px 96px;
+      }
+      header {
+        margin-bottom: 32px;
+      }
+      h1 {
+        font-size: clamp(2rem, 3vw, 3rem);
+        margin: 0 0 12px;
+      }
+      p {
+        margin: 0 0 16px;
+        line-height: 1.6;
+      }
+      ul {
+        margin: 0 0 24px 18px;
+        line-height: 1.6;
+      }
+      .cards {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        gap: 16px;
+        margin: 32px 0 40px;
+      }
+      .card {
+        background: #ffffff;
+        border-radius: 16px;
+        padding: 18px;
+        border: 1px solid #e2e8f0;
+        box-shadow: 0 4px 12px rgba(15, 23, 42, 0.05);
+      }
+      .card a {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        color: #2563eb;
+        font-weight: 600;
+        text-decoration: none;
+      }
+      .notice {
+        background: #e0f2fe;
+        border: 1px solid #bae6fd;
+        padding: 16px;
+        border-radius: 12px;
+      }
+      .cta {
+        display: inline-block;
+        margin-top: 12px;
+        padding: 10px 18px;
+        border-radius: 999px;
+        background: #0f172a;
+        color: #ffffff;
+        text-decoration: none;
+        font-weight: 600;
+      }
+      footer {
+        margin-top: 48px;
+        color: #64748b;
+        font-size: 0.95rem;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <h1>Caliape Enterprise API</h1>
+        <p>Documentación oficial para integrar los flujos Enterprise de Caliape: autenticación, procesamiento y resultados con trazabilidad.</p>
+      </header>
+
+      <ul>
+        <li>Endpoints seguros para autenticación Enterprise y tokens JWT.</li>
+        <li>Procesamiento de audio y datos con observabilidad y límites por tenant.</li>
+        <li>Compatibilidad con entornos productivos y pruebas controladas.</li>
+      </ul>
+
+      <section class="cards">
+        <div class="card">
+          <h2>Swagger UI</h2>
+          <p>Explorá los endpoints y usá <em>Try it out</em> con tus headers.</p>
+          <a href="/swagger/">Abrir Swagger UI →</a>
+        </div>
+        <div class="card">
+          <h2>OpenAPI spec</h2>
+          <p>Descargá la especificación pública en YAML.</p>
+          <a href="/openapi.yaml">Ver openapi.yaml →</a>
+        </div>
+        <div class="card">
+          <h2>Solicitar trial keys</h2>
+          <p>Pedí credenciales para probar la API en tu entorno.</p>
+          <a href="mailto:enterprise@caliape.com">Contactar →</a>
+        </div>
+      </section>
+
+      <div class="notice">
+        <strong>Importante:</strong>
+        <p>Para probar endpoints necesitás trial keys (<code>x-enterprise-key</code> y <code>x-enterprise-jwt</code>). Sin headers, las requests responden 401/403.</p>
+        <a class="cta" href="/swagger/">Ir a Swagger UI</a>
+      </div>
+
+      <footer>
+        <p>¿Dudas? Escribinos a <a href="mailto:enterprise@caliape.com">enterprise@caliape.com</a>.</p>
+      </footer>
+    </main>
+  </body>
+</html>
