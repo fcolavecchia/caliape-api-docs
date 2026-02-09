@@ -10,7 +10,7 @@ info:
     - audio_url (HTTPS, recomendado para >6MB)
     - Se valida content-type (audio/*). Formatos soportados: mp3, m4a, wav, aac, flac.
 
-    Webhooks (Etapa 4):
+    Webhooks:
     - Configuración por empresa: webhook_url (nullable) + webhook_enabled (default false)
     - Si webhook_enabled = true y webhook_url existe, se enviarán eventos al finalizar o fallar un caso.
     - La configuración se gestiona por backoffice (no hay endpoint público).
@@ -18,6 +18,16 @@ info:
 servers:
   - url: https://cjwyjqklzrufnbtnzxfa.supabase.co/functions/v1
     description: Production
+
+tags:
+  - name: Autorización
+    description: Obtención de JWT empresarial y validaciones de acceso.
+  - name: Creación de caso
+    description: Alta de casos y carga de audio.
+  - name: Obtención de resultados
+    description: Estado, outputs, transcripción y resumen del caso.
+  - name: Ver uso
+    description: Métricas de consumo mensual por empresa.
 
 components:
   securitySchemes:
@@ -175,6 +185,8 @@ paths:
   /v1-auth-token:
     post:
       summary: Obtener JWT empresarial
+      tags:
+        - Autorización
       description: |
         Intercambia API key por JWT empresarial (válido 10 minutos).
       security:
@@ -199,6 +211,8 @@ paths:
   /v1-cases:
     post:
       summary: Crear caso y subir audio
+      tags:
+        - Creación de caso
       description: |
         Header requerido:
         - x-enterprise-jwt: JWT empresarial obtenido en /v1-auth-token
@@ -297,6 +311,8 @@ paths:
   /v1-cases/{external_case_id}:
     get:
       summary: Obtener estado del caso
+      tags:
+        - Obtención de resultados
       parameters:
         - in: path
           name: external_case_id
@@ -336,6 +352,8 @@ paths:
   /v1-cases/{external_case_id}/outputs:
     get:
       summary: Obtener outputs del caso
+      tags:
+        - Obtención de resultados
       parameters:
         - in: path
           name: external_case_id
@@ -375,6 +393,8 @@ paths:
   /v1-transcribe-case/{external_case_id}:
     post:
       summary: Transcribir audio del caso
+      tags:
+        - Obtención de resultados
       parameters:
         - in: path
           name: external_case_id
@@ -436,6 +456,8 @@ paths:
   /v1-summarize-case/{external_case_id}:
     post:
       summary: Generar resumen del caso
+      tags:
+        - Obtención de resultados
       parameters:
         - in: path
           name: external_case_id
@@ -493,6 +515,8 @@ paths:
   /v1-usage:
     get:
       summary: Obtener uso mensual (sin costos)
+      tags:
+        - Ver uso
       description: |
         Devuelve el conteo de casos para un período. No expone costos al cliente.
       parameters:
