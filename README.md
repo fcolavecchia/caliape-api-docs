@@ -5,8 +5,8 @@ Este repositorio publica la documentación de la Enterprise API en GitHub Pages.
 ## Estructura
 
 - `index.html`: landing pública.
-- `openapi.yaml`: especificación OpenAPI (sin credenciales).
-- `swagger/`: Swagger UI configurado para cargar `../openapi.yaml`.
+- `enterprise-api-v1.yaml`: especificación enterprise-api-v1 (sin credenciales).
+- `swagger/`: Swagger UI configurado para cargar `../enterprise-api-v1.yaml`.
 
 > Nota: actualmente Swagger UI se carga desde CDN para simplificar el despliegue. Si necesitás
 > servir los assets locales, descargá los archivos `dist` de Swagger UI y reemplazá los links
@@ -35,7 +35,7 @@ Este repositorio publica la documentación de la Enterprise API en GitHub Pages.
 ## Verificación final
 
 - `https://api.caliape.com/` (landing)
-- `https://api.caliape.com/openapi.yaml` (spec)
+- `https://api.caliape.com/enterprise-api-v1.yaml` (spec)
 - `https://api.caliape.com/swagger/` (Swagger UI)
 
 ## Onboarding rápido (referencia)

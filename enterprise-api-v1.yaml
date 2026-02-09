@@ -1,0 +1,545 @@
+openapi: 3.0.0
+info:
+  title: Caliape Enterprise API
+  version: 1.0.0
+  description: |
+    API para procesamiento de consultas médicas (transcripción + resumen).
+
+    Upload:
+    - Multipart (≤6MB)
+    - audio_url (HTTPS, recomendado para >6MB)
+    - Se valida content-type (audio/*). Formatos soportados: mp3, m4a, wav, aac, flac.
+
+    Webhooks (Etapa 4):
+    - Configuración por empresa: webhook_url (nullable) + webhook_enabled (default false)
+    - Si webhook_enabled = true y webhook_url existe, se enviarán eventos al finalizar o fallar un caso.
+    - La configuración se gestiona por backoffice (no hay endpoint público).
+
+servers:
+  - url: https://cjwyjqklzrufnbtnzxfa.supabase.co/functions/v1
+    description: Production
+
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: x-enterprise-key
+      description: API key de la empresa (solo para /v1-auth-token)
+    SupabaseAnon:
+      type: apiKey
+      in: header
+      name: apikey
+      description: Supabase anon key (requerida por el gateway)
+  schemas:
+    EnterpriseWebhookConfig:
+      type: object
+      description: Configuración de webhooks por empresa (Etapa 4)
+      properties:
+        webhook_url:
+          type: string
+          format: uri
+          nullable: true
+          description: URL HTTPS del webhook
+        webhook_enabled:
+          type: boolean
+          default: false
+          description: Habilita el envío de webhooks
+    CaseStatusResponse:
+      type: object
+      properties:
+        case_id:
+          type: string
+          format: uuid
+        external_case_id:
+          type: string
+        status:
+          type: string
+          enum: [created, processing, done, failed]
+        error_message:
+          type: string
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    CaseOutputsResponse:
+      type: object
+      properties:
+        transcription:
+          type: object
+        summary:
+          type: object
+        patient_instructions:
+          type: string
+          nullable: true
+    TranscribeRequest:
+      type: object
+      properties:
+        language:
+          type: string
+          default: es
+        model:
+          type: string
+          default: whisper-1
+        temperature:
+          type: number
+        version:
+          type: string
+    SummarizeRequest:
+      type: object
+      properties:
+        language:
+          type: string
+          default: es
+        specialty:
+          type: string
+          default: base
+        model:
+          type: string
+          default: gpt-3.5-turbo
+        temperature:
+          type: number
+          default: 0.3
+        max_tokens:
+          type: integer
+          default: 1500
+        version:
+          type: string
+    AuthTokenResponse:
+      type: object
+      properties:
+        access_token:
+          type: string
+        token_type:
+          type: string
+          enum: [bearer]
+        expires_in:
+          type: integer
+          example: 600
+    CaseCreateResponse:
+      type: object
+      properties:
+        case_id:
+          type: string
+          format: uuid
+        external_case_id:
+          type: string
+        status:
+          type: string
+          enum: [created]
+        audio_storage_path:
+          type: string
+        upload_url:
+          type: string
+          format: uri
+          nullable: true
+          description: URL firmada para upload directo a Storage (si aplica)
+    TranscribeResponse:
+      type: object
+      properties:
+        case_id:
+          type: string
+          format: uuid
+        external_case_id:
+          type: string
+        status:
+          type: string
+          enum: [processing]
+        transcription_ready:
+          type: boolean
+    SummarizeResponse:
+      type: object
+      properties:
+        case_id:
+          type: string
+          format: uuid
+        external_case_id:
+          type: string
+        status:
+          type: string
+          enum: [processing, done]
+    UsageResponse:
+      type: object
+      properties:
+        period:
+          type: string
+          example: "2026-01"
+        case_count:
+          type: integer
+          example: 12
+
+paths:
+  /v1-auth-token:
+    post:
+      summary: Obtener JWT empresarial
+      description: |
+        Intercambia API key por JWT empresarial (válido 10 minutos).
+      security:
+        - ApiKeyAuth: []
+        - SupabaseAnon: []
+      responses:
+        '200':
+          description: Token generado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthTokenResponse'
+        '401':
+          description: API key inválida o faltante
+        '403':
+          description: Enterprise suspendido
+        '404':
+          description: Enterprise no encontrado
+        '500':
+          description: Error interno
+
+  /v1-cases:
+    post:
+      summary: Crear caso y subir audio
+      description: |
+        Header requerido:
+        - x-enterprise-jwt: JWT empresarial obtenido en /v1-auth-token
+        - apikey + Authorization: anon key de Supabase (gateway)
+
+        Soporta dos métodos:
+        1) multipart/form-data (≤6MB)
+        2) application/json con audio_url (HTTPS)
+        3) application/json con upload_url (signed upload, recomendado para >6MB)
+      parameters:
+        - in: header
+          name: x-enterprise-jwt
+          required: true
+          schema:
+            type: string
+          description: JWT empresarial
+        - in: header
+          name: apikey
+          required: true
+          schema:
+            type: string
+          description: Supabase anon key
+        - in: header
+          name: Authorization
+          required: true
+          schema:
+            type: string
+          description: Bearer <Supabase anon key>
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [audio, external_case_id]
+              properties:
+                audio:
+                  type: string
+                  format: binary
+                  description: Archivo de audio (max 6MB)
+                external_case_id:
+                  type: string
+                  description: ID de caso externo
+          application/json:
+            schema:
+              oneOf:
+                - type: object
+                  required: [audio_url, external_case_id]
+                  properties:
+                    audio_url:
+                      type: string
+                      format: uri
+                      description: URL HTTPS al audio (content-type audio/*)
+                    external_case_id:
+                      type: string
+                - type: object
+                  required: [external_case_id, filename, content_type]
+                  properties:
+                    external_case_id:
+                      type: string
+                    filename:
+                      type: string
+                      description: Nombre de archivo para upload firmado
+                    content_type:
+                      type: string
+                      description: Content-Type del audio (audio/*)
+                    content_length:
+                      type: number
+                      description: Tamaño en bytes (si se conoce)
+      responses:
+        '201':
+          description: Caso creado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CaseCreateResponse'
+        '200':
+          description: Idempotencia (caso ya existe)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CaseCreateResponse'
+        '400':
+          description: Error de validación (incluye content-type inválido en audio_url)
+        '401':
+          description: JWT inválido
+        '413':
+          description: Archivo demasiado grande (usar audio_url o upload_url)
+        '415':
+          description: Content-Type no soportado
+        '502':
+          description: No se pudo descargar audio_url
+        '500':
+          description: Error interno
+
+  /v1-cases/{external_case_id}:
+    get:
+      summary: Obtener estado del caso
+      parameters:
+        - in: path
+          name: external_case_id
+          required: true
+          schema:
+            type: string
+        - in: header
+          name: x-enterprise-jwt
+          required: true
+          schema:
+            type: string
+          description: JWT empresarial
+        - in: header
+          name: apikey
+          required: true
+          schema:
+            type: string
+          description: Supabase anon key
+        - in: header
+          name: Authorization
+          required: true
+          schema:
+            type: string
+          description: Bearer <Supabase anon key>
+      responses:
+        '200':
+          description: Estado del caso
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CaseStatusResponse'
+        '404':
+          description: Case no encontrado
+        '500':
+          description: Error interno
+
+  /v1-cases/{external_case_id}/outputs:
+    get:
+      summary: Obtener outputs del caso
+      parameters:
+        - in: path
+          name: external_case_id
+          required: true
+          schema:
+            type: string
+        - in: header
+          name: x-enterprise-jwt
+          required: true
+          schema:
+            type: string
+          description: JWT empresarial
+        - in: header
+          name: apikey
+          required: true
+          schema:
+            type: string
+          description: Supabase anon key
+        - in: header
+          name: Authorization
+          required: true
+          schema:
+            type: string
+          description: Bearer <Supabase anon key>
+      responses:
+        '200':
+          description: Outputs del caso
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CaseOutputsResponse'
+        '404':
+          description: Outputs o case no encontrado
+        '500':
+          description: Error interno
+
+  /v1-transcribe-case/{external_case_id}:
+    post:
+      summary: Transcribir audio del caso
+      parameters:
+        - in: path
+          name: external_case_id
+          required: true
+          schema:
+            type: string
+        - in: header
+          name: x-enterprise-jwt
+          required: true
+          schema:
+            type: string
+          description: JWT empresarial
+        - in: header
+          name: apikey
+          required: true
+          schema:
+            type: string
+          description: Supabase anon key
+        - in: header
+          name: Authorization
+          required: true
+          schema:
+            type: string
+          description: Bearer <Supabase anon key>
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TranscribeRequest'
+      responses:
+        '200':
+          description: Transcripción lista o generada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TranscribeResponse'
+        '202':
+          description: Transcripción en progreso
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TranscribeResponse'
+        '400':
+          description: external_case_id faltante
+        '404':
+          description: Case no encontrado
+        '409':
+          description: Conflicto (estado inválido)
+        '403':
+          description: audio_storage_path no pertenece al tenant
+        '429':
+          description: Límite mensual excedido
+        '502':
+          description: Error descargando audio
+        '500':
+          description: Error interno
+
+  /v1-summarize-case/{external_case_id}:
+    post:
+      summary: Generar resumen del caso
+      parameters:
+        - in: path
+          name: external_case_id
+          required: true
+          schema:
+            type: string
+        - in: header
+          name: x-enterprise-jwt
+          required: true
+          schema:
+            type: string
+          description: JWT empresarial
+        - in: header
+          name: apikey
+          required: true
+          schema:
+            type: string
+          description: Supabase anon key
+        - in: header
+          name: Authorization
+          required: true
+          schema:
+            type: string
+          description: Bearer <Supabase anon key>
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SummarizeRequest'
+      responses:
+        '200':
+          description: Resumen listo o generado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SummarizeResponse'
+        '202':
+          description: Resumen en progreso
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SummarizeResponse'
+        '400':
+          description: external_case_id faltante
+        '404':
+          description: Case no encontrado
+        '409':
+          description: Transcripción requerida
+        '429':
+          description: Límite mensual excedido
+        '500':
+          description: Error interno
+
+  /v1-usage:
+    get:
+      summary: Obtener uso mensual (sin costos)
+      description: |
+        Devuelve el conteo de casos para un período. No expone costos al cliente.
+      parameters:
+        - in: query
+          name: month
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 12
+          description: Mes (1-12)
+        - in: query
+          name: year
+          required: false
+          schema:
+            type: integer
+          description: Año (si falta, usa el año actual)
+        - in: header
+          name: x-enterprise-jwt
+          required: true
+          schema:
+            type: string
+          description: JWT empresarial
+        - in: header
+          name: apikey
+          required: true
+          schema:
+            type: string
+          description: Supabase anon key
+        - in: header
+          name: Authorization
+          required: true
+          schema:
+            type: string
+          description: Bearer <Supabase anon key>
+      responses:
+        '200':
+          description: Uso mensual
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UsageResponse'
+        '400':
+          description: Parámetros inválidos
+        '401':
+          description: JWT inválido
+        '405':
+          description: Método no permitido
+        '500':
+          description: Error interno
