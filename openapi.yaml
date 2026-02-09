@@ -1,0 +1,103 @@
+openapi: 3.0.3
+info:
+  title: Caliape Enterprise API
+  version: 1.0.0
+  description: |
+    API Enterprise para autenticación, procesamiento y resultados.
+    Esta especificación es pública y no contiene credenciales.
+servers:
+  - url: https://api.caliape.com
+    description: Producción
+components:
+  securitySchemes:
+    EnterpriseKey:
+      type: apiKey
+      in: header
+      name: x-enterprise-key
+      description: Clave Enterprise entregada por Caliape.
+    EnterpriseJwt:
+      type: apiKey
+      in: header
+      name: x-enterprise-jwt
+      description: JWT obtenido desde /auth/jwt.
+security:
+  - EnterpriseKey: []
+    EnterpriseJwt: []
+paths:
+  /auth/jwt:
+    post:
+      summary: Obtener JWT Enterprise
+      description: Genera un JWT para utilizar en llamadas posteriores.
+      security:
+        - EnterpriseKey: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                tenant_id:
+                  type: string
+                  description: Identificador del tenant.
+              required:
+                - tenant_id
+      responses:
+        "200":
+          description: JWT generado exitosamente.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  jwt:
+                    type: string
+                    description: Token JWT para x-enterprise-jwt.
+        "401":
+          description: Credenciales inválidas.
+  /audio/transcribe:
+    post:
+      summary: Transcripción de audio
+      description: Envía un archivo de audio para transcripción.
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        "200":
+          description: Transcripción completada.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  text:
+                    type: string
+                    description: Resultado de la transcripción.
+        "401":
+          description: No autorizado.
+  /analytics/usage:
+    get:
+      summary: Uso y métricas
+      description: Obtiene métricas agregadas del tenant.
+      responses:
+        "200":
+          description: Métricas disponibles.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  requests:
+                    type: integer
+                  duration_seconds:
+                    type: number
+                    format: float
+        "401":
+          description: No autorizado.
