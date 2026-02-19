@@ -89,131 +89,147 @@
     <div id="swagger-ui"></div>
     <script src="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/swagger-ui-bundle.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/swagger-ui-standalone-preset.js"></script>
-    <script src="./codeExamplesByOperation.js"></script>
     <script>
-      const codeExamplesByOperation = window.codeExamplesByOperation || {};
+      function resolveExamplesUrl() {
+        const baseUrl = new URL(window.location.href);
+        const lastSegment = baseUrl.pathname.split("/").pop() || "";
+        if (!baseUrl.pathname.endsWith("/") && !lastSegment.includes(".")) {
+          baseUrl.pathname = `${baseUrl.pathname}/`;
+        }
+        return new URL("codeExamplesByOperation.js", baseUrl).toString();
+      }
 
-      function buildExampleTabs(operationKey, snippets) {
-        const wrapper = document.createElement("section");
-        wrapper.className = "code-examples";
-        wrapper.dataset.operationExamples = operationKey;
+      function initializeSwaggerUi() {
+        const codeExamplesByOperation = window.codeExamplesByOperation || {};
 
-        const header = document.createElement("div");
-        header.className = "code-examples-header";
+        function buildExampleTabs(operationKey, snippets) {
+          const wrapper = document.createElement("section");
+          wrapper.className = "code-examples";
+          wrapper.dataset.operationExamples = operationKey;
 
-        const title = document.createElement("strong");
-        title.textContent = "Ejemplos de cliente";
+          const header = document.createElement("div");
+          header.className = "code-examples-header";
 
-        const copyButton = document.createElement("button");
-        copyButton.className = "copy-button";
-        copyButton.type = "button";
-        copyButton.textContent = "📋 Copiar";
+          const title = document.createElement("strong");
+          title.textContent = "Ejemplos de cliente";
 
-        const tabs = document.createElement("div");
-        tabs.className = "tab-list";
+          const copyButton = document.createElement("button");
+          copyButton.className = "copy-button";
+          copyButton.type = "button";
+          copyButton.textContent = "📋 Copiar";
 
-        const panelsContainer = document.createElement("div");
+          const tabs = document.createElement("div");
+          tabs.className = "tab-list";
 
-        const langs = [
-          ["curl", "curl"],
-          ["python", "Python"],
-          ["typescript", "TypeScript"],
-        ];
+          const panelsContainer = document.createElement("div");
 
-        let activeLang = "curl";
-        const panelRefs = {};
-        const tabRefs = {};
+          const langs = [
+            ["curl", "curl"],
+            ["python", "Python"],
+            ["typescript", "TypeScript"],
+          ];
 
-        const setActiveLang = (lang) => {
-          activeLang = lang;
-          langs.forEach(([key]) => {
-            tabRefs[key].classList.toggle("active", key === lang);
-            panelRefs[key].classList.toggle("active", key === lang);
+          let activeLang = "curl";
+          const panelRefs = {};
+          const tabRefs = {};
+
+          const setActiveLang = (lang) => {
+            activeLang = lang;
+            langs.forEach(([key]) => {
+              tabRefs[key].classList.toggle("active", key === lang);
+              panelRefs[key].classList.toggle("active", key === lang);
+            });
+          };
+
+          langs.forEach(([key, label]) => {
+            const tabBtn = document.createElement("button");
+            tabBtn.className = "tab-btn";
+            tabBtn.type = "button";
+            tabBtn.textContent = label;
+            tabBtn.addEventListener("click", () => setActiveLang(key));
+            tabRefs[key] = tabBtn;
+            tabs.appendChild(tabBtn);
+
+            const panel = document.createElement("div");
+            panel.className = "tab-panel";
+            const pre = document.createElement("pre");
+            const code = document.createElement("code");
+            code.textContent = snippets[key] || "";
+            pre.appendChild(code);
+            panel.appendChild(pre);
+            panelRefs[key] = panel;
+            panelsContainer.appendChild(panel);
           });
-        };
 
-        langs.forEach(([key, label]) => {
-          const tabBtn = document.createElement("button");
-          tabBtn.className = "tab-btn";
-          tabBtn.type = "button";
-          tabBtn.textContent = label;
-          tabBtn.addEventListener("click", () => setActiveLang(key));
-          tabRefs[key] = tabBtn;
-          tabs.appendChild(tabBtn);
+          copyButton.addEventListener("click", async () => {
+            try {
+              await navigator.clipboard.writeText(snippets[activeLang] || "");
+              const previous = copyButton.textContent;
+              copyButton.textContent = "✅ Copiado";
+              setTimeout(() => {
+                copyButton.textContent = previous;
+              }, 1200);
+            } catch {
+              copyButton.textContent = "⚠️ Sin permisos";
+            }
+          });
 
-          const panel = document.createElement("div");
-          panel.className = "tab-panel";
-          const pre = document.createElement("pre");
-          const code = document.createElement("code");
-          code.textContent = snippets[key] || "";
-          pre.appendChild(code);
-          panel.appendChild(pre);
-          panelRefs[key] = panel;
-          panelsContainer.appendChild(panel);
-        });
+          header.appendChild(title);
+          header.appendChild(copyButton);
+          wrapper.appendChild(header);
+          wrapper.appendChild(tabs);
+          wrapper.appendChild(panelsContainer);
 
-        copyButton.addEventListener("click", async () => {
-          try {
-            await navigator.clipboard.writeText(snippets[activeLang] || "");
-            const previous = copyButton.textContent;
-            copyButton.textContent = "✅ Copiado";
-            setTimeout(() => {
-              copyButton.textContent = previous;
-            }, 1200);
-          } catch {
-            copyButton.textContent = "⚠️ Sin permisos";
-          }
-        });
+          setActiveLang("curl");
+          return wrapper;
+        }
 
-        header.appendChild(title);
-        header.appendChild(copyButton);
-        wrapper.appendChild(header);
-        wrapper.appendChild(tabs);
-        wrapper.appendChild(panelsContainer);
+        function mountCodeExamples() {
+          document.querySelectorAll(".opblock").forEach((opblock) => {
+            if (opblock.querySelector("[data-operation-examples]")) {
+              return;
+            }
 
-        setActiveLang("curl");
-        return wrapper;
-      }
+            const method = (opblock.getAttribute("data-method") || "").toLowerCase();
+            const path = opblock.getAttribute("data-path") || "";
+            const key = `${method} ${path}`;
+            const snippets = codeExamplesByOperation[key];
+            if (!snippets) {
+              return;
+            }
 
-      function mountCodeExamples() {
-        document.querySelectorAll(".opblock").forEach((opblock) => {
-          if (opblock.querySelector("[data-operation-examples]")) {
-            return;
-          }
+            const summary = opblock.querySelector(".opblock-summary");
+            if (!summary) {
+              return;
+            }
 
-          const method = (opblock.getAttribute("data-method") || "").toLowerCase();
-          const path = opblock.getAttribute("data-path") || "";
-          const key = `${method} ${path}`;
-          const snippets = codeExamplesByOperation[key];
-          if (!snippets) {
-            return;
-          }
+            const tabs = buildExampleTabs(key, snippets);
+            summary.insertAdjacentElement("afterend", tabs);
+          });
+        }
 
-          const summary = opblock.querySelector(".opblock-summary");
-          if (!summary) {
-            return;
-          }
-
-          const tabs = buildExampleTabs(key, snippets);
-          summary.insertAdjacentElement("afterend", tabs);
+        window.ui = SwaggerUIBundle({
+          url: "../enterprise-api-v1.yaml",
+          dom_id: "#swagger-ui",
+          presets: [SwaggerUIBundle.presets.apis, SwaggerUIStandalonePreset],
+          layout: "StandaloneLayout",
+          onComplete: () => {
+            mountCodeExamples();
+            const target = document.getElementById("swagger-ui");
+            if (!target) {
+              return;
+            }
+            const observer = new MutationObserver(() => mountCodeExamples());
+            observer.observe(target, { childList: true, subtree: true });
+          },
         });
       }
 
-      window.ui = SwaggerUIBundle({
-        url: "../enterprise-api-v1.yaml",
-        dom_id: "#swagger-ui",
-        presets: [SwaggerUIBundle.presets.apis, SwaggerUIStandalonePreset],
-        layout: "StandaloneLayout",
-        onComplete: () => {
-          mountCodeExamples();
-          const target = document.getElementById("swagger-ui");
-          if (!target) {
-            return;
-          }
-          const observer = new MutationObserver(() => mountCodeExamples());
-          observer.observe(target, { childList: true, subtree: true });
-        },
-      });
+      const examplesScript = document.createElement("script");
+      examplesScript.src = resolveExamplesUrl();
+      examplesScript.onload = initializeSwaggerUi;
+      examplesScript.onerror = initializeSwaggerUi;
+      document.head.appendChild(examplesScript);
     </script>
   </body>
 </html>
