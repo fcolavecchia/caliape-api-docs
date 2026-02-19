@@ -8,9 +8,17 @@
     <style>
       :root {
         color-scheme: light;
-        font-family: "Inter", "Segoe UI", system-ui, -apple-system, sans-serif;
-        background: #f7f9fc;
-        color: #0f172a;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+        --primary-color: #263c2a;
+        --secondary-color: #086d2f;
+        --text-color: #333;
+        --light-bg: #f8f9fa;
+        --white: #fff;
+        --gray: #6c757d;
+        --light-gray: #e9ecef;
+        --box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        background: var(--light-bg);
+        color: var(--text-color);
       }
       body {
         margin: 0;
@@ -43,40 +51,66 @@
         margin: 32px 0 40px;
       }
       .card {
-        background: #ffffff;
+        background: var(--white);
         border-radius: 16px;
         padding: 18px;
-        border: 1px solid #e2e8f0;
-        box-shadow: 0 4px 12px rgba(15, 23, 42, 0.05);
+        border: 1px solid var(--light-gray);
+        box-shadow: var(--box-shadow);
+        display: flex;
+        flex-direction: column;
       }
       .card a {
         display: inline-flex;
         align-items: center;
         gap: 8px;
-        color: #2563eb;
+        color: var(--white);
         font-weight: 600;
         text-decoration: none;
+        background: var(--primary-color);
+        border-radius: 999px;
+        padding: 9px 14px;
+        margin-left: auto;
+        margin-top: auto;
+      }
+      .card a:hover {
+        background: var(--secondary-color);
+      }
+      .card h2 {
+        color: var(--primary-color);
       }
       .notice {
-        background: #e0f2fe;
-        border: 1px solid #bae6fd;
+        background: #eef6f0;
+        border: 1px solid #cfe2d4;
         padding: 16px;
         border-radius: 12px;
+        display: flex;
+        flex-direction: column;
+      }
+      .notice strong {
+        color: var(--primary-color);
       }
       .cta {
-        display: inline-block;
+        display: inline-flex;
+        align-items: center;
         margin-top: 12px;
         padding: 10px 18px;
         border-radius: 999px;
-        background: #0f172a;
-        color: #ffffff;
+        background: var(--primary-color);
+        color: var(--white);
         text-decoration: none;
         font-weight: 600;
+        margin-left: auto;
+      }
+      .cta:hover {
+        background: var(--secondary-color);
       }
       footer {
         margin-top: 48px;
-        color: #64748b;
+        color: var(--gray);
         font-size: 0.95rem;
+      }
+      footer a {
+        color: var(--secondary-color);
       }
     </style>
   </head>
@@ -97,24 +131,25 @@
         <div class="card">
           <h2>Swagger UI</h2>
           <p>Explorá los endpoints y usá <em>Try it out</em> con tus headers.</p>
-          <a href="/docs/">Abrir Swagger UI →</a>
+          <a href="/docs/">Abrir Swagger UI</a>
         </div>
         <div class="card">
           <h2>OpenAPI spec</h2>
           <p>Descargá la especificación pública en YAML.</p>
-          <a href="/enterprise-api-v1.yaml">Ver enterprise-api-v1.yaml →</a>
+          <a href="/spec/">Ver enterprise-api-v1.yaml</a>
         </div>
         <div class="card">
-          <h2>Solicitar trial keys</h2>
-          <p>Pedí credenciales para probar la API en tu entorno.</p>
-          <a href="mailto:info@caliape.com">Contactar →</a>
+          <h2>Integración</h2>
+          <p>Snippets listos para curl, Python y TypeScript por endpoint.</p>
+          <a href="/ejemplos/">Abrir ejemplos</a>
         </div>
+
       </section>
 
       <div class="notice">
         <strong>Importante:</strong>
-        <p>Para probar endpoints necesitás trial keys (<code>x-enterprise-key</code> y <code>x-enterprise-jwt</code>). Sin headers, las requests responden 401/403.</p>
-        <a class="cta" href="/docs/">Ir a Swagger UI</a>
+        <p>Para usar la API necesitás trial keys. Te compartiremos <code>x-enterprise-key</code> y <code>x-enterprise-jwt</code> para pruebas en tu entorno. Sin esas credenciales, las requests devuelven 401/403.</p>
+        <a class="cta" href="mailto:info@caliape.com">Pedí las trial keys</a>
       </div>
 
       <footer>

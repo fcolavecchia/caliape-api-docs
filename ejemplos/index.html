@@ -1,0 +1,300 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Caliape Enterprise API - Ejemplos</title>
+    <link rel="icon" type="image/ico" href="/assets/favicon.ico" />
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/styles/github-dark.min.css"
+    />
+    <style>
+      :root {
+        color-scheme: light;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+        --primary-color: #263c2a;
+        --secondary-color: #086d2f;
+        --text-color: #333;
+        --light-bg: #f8f9fa;
+        --white: #fff;
+        --gray: #6c757d;
+        --light-gray: #e9ecef;
+        --box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        background: var(--light-bg);
+        color: var(--text-color);
+      }
+      body {
+        margin: 0;
+      }
+      main {
+        max-width: 1100px;
+        margin: 0 auto;
+        padding: 44px 20px 60px;
+      }
+      h1 {
+        margin: 0 0 8px;
+        font-size: clamp(1.8rem, 3vw, 2.5rem);
+      }
+      p {
+        margin: 0 0 18px;
+        color: var(--gray);
+        line-height: 1.55;
+      }
+      .actions {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+        margin-bottom: 24px;
+      }
+      .link-btn {
+        border: 1px solid var(--light-gray);
+        border-radius: 999px;
+        padding: 8px 14px;
+        text-decoration: none;
+        color: var(--secondary-color);
+        background: var(--white);
+        font-size: 14px;
+      }
+      .link-btn:hover {
+        background: #eef6f0;
+      }
+      .layout {
+        display: grid;
+        grid-template-columns: minmax(240px, 320px) 1fr;
+        gap: 16px;
+      }
+      .panel {
+        background: var(--white);
+        border: 1px solid var(--light-gray);
+        border-radius: 14px;
+        box-shadow: var(--box-shadow);
+      }
+      .operations {
+        max-height: 70vh;
+        overflow: auto;
+      }
+      .op-btn {
+        display: block;
+        width: 100%;
+        text-align: left;
+        border: 0;
+        border-bottom: 1px solid var(--light-gray);
+        background: var(--white);
+        padding: 12px 14px;
+        font-size: 13px;
+        cursor: pointer;
+        color: var(--text-color);
+      }
+      .op-btn:last-child {
+        border-bottom: 0;
+      }
+      .op-btn.active {
+        background: #eef6f0;
+        color: var(--secondary-color);
+      }
+      .editor {
+        padding: 14px;
+      }
+      .title {
+        margin: 0 0 12px;
+        font-size: 14px;
+        color: var(--primary-color);
+      }
+      .tabs {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+        margin-bottom: 10px;
+      }
+      .tab {
+        border: 1px solid var(--light-gray);
+        border-radius: 999px;
+        padding: 6px 11px;
+        background: var(--white);
+        font-size: 12px;
+        cursor: pointer;
+      }
+      .tab.active {
+        background: #eef6f0;
+        color: var(--secondary-color);
+        border-color: #cfe2d4;
+      }
+      .snippet-wrap {
+        position: relative;
+      }
+      .copy-icon-btn {
+        position: absolute;
+        top: 8px;
+        right: 8px;
+        width: 30px;
+        height: 30px;
+        border: 1px solid var(--light-gray);
+        background: var(--white);
+        border-radius: 8px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        color: #0f172a;
+        z-index: 1;
+      }
+      .copy-icon-btn:hover {
+        background: #eef6f0;
+      }
+      pre {
+        margin: 0;
+        background: var(--primary-color);
+        color: #e2e8f0;
+        border-radius: 10px;
+        padding: 46px 14px 14px;
+        overflow: auto;
+        font-size: 12px;
+        line-height: 1.55;
+      }
+      @media (max-width: 900px) {
+        .layout {
+          grid-template-columns: 1fr;
+        }
+        .operations {
+          max-height: 35vh;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Ejemplos de Integración</h1>
+      <p>Snippets listos para copiar por endpoint en curl, Python y TypeScript.</p>
+      <div class="actions">
+        <a class="link-btn" href="/docs/">Abrir Swagger UI</a>
+        <a class="link-btn" href="/">Volver al inicio</a>
+      </div>
+
+      <section class="layout">
+        <aside class="panel operations" id="operations"></aside>
+        <article class="panel editor">
+          <p class="title" id="operation-title">Selecciona un endpoint</p>
+          <div class="tabs" id="tabs"></div>
+          <div class="snippet-wrap">
+            <button type="button" class="copy-icon-btn" id="copy-btn" aria-label="Copiar snippet" title="Copiar snippet">
+              <svg id="copy-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <rect x="9" y="9" width="11" height="11" rx="2" stroke="currentColor" stroke-width="1.8"></rect>
+                <rect x="4" y="4" width="11" height="11" rx="2" stroke="currentColor" stroke-width="1.8"></rect>
+              </svg>
+            </button>
+            <pre><code id="snippet" class="language-bash"></code></pre>
+          </div>
+        </article>
+      </section>
+    </main>
+
+    <script src="./codeExamplesByOperation.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/highlight.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/languages/python.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/languages/typescript.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/languages/bash.min.js"></script>
+    <script>
+      const examples = window.codeExamplesByOperation || {};
+      const operationKeys = Object.keys(examples);
+
+      const operationsEl = document.getElementById("operations");
+      const tabsEl = document.getElementById("tabs");
+      const snippetEl = document.getElementById("snippet");
+      const titleEl = document.getElementById("operation-title");
+      const copyBtn = document.getElementById("copy-btn");
+      const copyIconEl = document.getElementById("copy-icon");
+
+      const langs = [
+        ["curl", "curl"],
+        ["python", "Python"],
+        ["typescript", "TypeScript"],
+      ];
+      const hljsLangByExampleLang = {
+        curl: "bash",
+        python: "python",
+        typescript: "typescript",
+      };
+
+      let currentOperation = operationKeys[0] || null;
+      let currentLang = "curl";
+
+      function renderOperations() {
+        operationsEl.innerHTML = "";
+        operationKeys.forEach((key) => {
+          const button = document.createElement("button");
+          button.type = "button";
+          button.className = "op-btn";
+          button.textContent = key;
+          button.classList.toggle("active", key === currentOperation);
+          button.addEventListener("click", () => {
+            currentOperation = key;
+            currentLang = "curl";
+            renderOperations();
+            renderTabs();
+            renderSnippet();
+          });
+          operationsEl.appendChild(button);
+        });
+      }
+
+      function renderTabs() {
+        tabsEl.innerHTML = "";
+        langs.forEach(([key, label]) => {
+          const button = document.createElement("button");
+          button.type = "button";
+          button.className = "tab";
+          button.textContent = label;
+          button.classList.toggle("active", key === currentLang);
+          button.addEventListener("click", () => {
+            currentLang = key;
+            renderTabs();
+            renderSnippet();
+          });
+          tabsEl.appendChild(button);
+        });
+      }
+
+      function renderSnippet() {
+        if (!currentOperation) {
+          titleEl.textContent = "No hay ejemplos cargados";
+          snippetEl.textContent = "";
+          return;
+        }
+
+        titleEl.textContent = currentOperation;
+        const snippet = examples[currentOperation][currentLang] || "";
+        const hljsLang = hljsLangByExampleLang[currentLang] || "plaintext";
+        snippetEl.className = "language-" + hljsLang;
+        if (window.hljs && window.hljs.getLanguage(hljsLang)) {
+          snippetEl.innerHTML = window.hljs.highlight(snippet, { language: hljsLang }).value;
+        } else {
+          snippetEl.textContent = snippet;
+        }
+      }
+
+      copyBtn.addEventListener("click", async () => {
+        const content = snippetEl.textContent || "";
+        if (!content) {
+          return;
+        }
+        try {
+          await navigator.clipboard.writeText(content);
+          copyIconEl.innerHTML =
+            '<path d="M20 7L10 17l-5-5" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"></path>';
+        } catch {
+          copyIconEl.innerHTML =
+            '<path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round"></path>';
+        }
+        setTimeout(() => {
+          copyIconEl.innerHTML =
+            '<rect x="9" y="9" width="11" height="11" rx="2" stroke="currentColor" stroke-width="1.8"></rect><rect x="4" y="4" width="11" height="11" rx="2" stroke="currentColor" stroke-width="1.8"></rect>';
+        }, 1200);
+      });
+
+      renderOperations();
+      renderTabs();
+      renderSnippet();
+    </script>
+  </body>
+</html>
