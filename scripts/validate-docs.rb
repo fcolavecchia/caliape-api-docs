@@ -14,7 +14,8 @@ SPEC_INDEX_PATH = File.join(ROOT, "spec", "index.html")
 SMOKE_TEST_SCRIPTS = [
   File.join(ROOT, "scripts", "test-endpoints.sh"),
   File.join(ROOT, "scripts", "test-endpoints.py"),
-  File.join(ROOT, "scripts", "test-endpoints.ts")
+  File.join(ROOT, "scripts", "test-endpoints.ts"),
+  File.join(ROOT, "scripts", "test-processing.py")
 ].freeze
 
 errors = []
@@ -156,9 +157,9 @@ unless status.success?
   fail_with(errors, "scripts/test-endpoints.sh no pasa bash -n:\n#{stdout}#{stderr}")
 end
 
-stdout, stderr, status = Open3.capture3("python3", "-m", "py_compile", SMOKE_TEST_SCRIPTS[1])
+stdout, stderr, status = Open3.capture3("python3", "-m", "py_compile", SMOKE_TEST_SCRIPTS[1], SMOKE_TEST_SCRIPTS[3])
 unless status.success?
-  fail_with(errors, "scripts/test-endpoints.py no pasa py_compile:\n#{stdout}#{stderr}")
+  fail_with(errors, "scripts/test-endpoints.py o scripts/test-processing.py no pasa py_compile:\n#{stdout}#{stderr}")
 end
 
 stdout, stderr, status = Open3.capture3("node", "--experimental-strip-types", "--check", SMOKE_TEST_SCRIPTS[2])

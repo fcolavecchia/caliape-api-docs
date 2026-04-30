@@ -59,6 +59,21 @@ Los scripts recorren todos los endpoints de la spec usando un `external_case_id`
 
 También verifican que `/v1-recorder-sessions` devuelva el mismo `RETURN_ORIGIN` enviado y, con `RUN_NEGATIVE_TESTS=true`, que rechace un origin inválido. `RUN_PROCESSING_ENDPOINTS` y `RUN_LEGACY_ENDPOINTS` permiten desactivar llamadas que pueden disparar procesamiento/consumo.
 
+## Test manual de procesamiento real
+
+Este test dispara procesamiento, hace polling hasta un estado terminal y valida estructura mínima de outputs. Puede tardar varios minutos y consumir recursos, por eso no corre en CI ni en el validador default.
+
+```sh
+python3 scripts/test-processing.py
+```
+
+Variables útiles:
+
+- `PROCESSING_TIMEOUT_SECONDS`: timeout total, default `300`.
+- `PROCESSING_POLL_SECONDS`: intervalo de polling, default `10`.
+- `PROCESSING_EXTERNAL_CASE_ID`: ID fijo opcional; si falta, se genera uno único.
+- `PROCESSING_TRIGGER_EACH_POLL`: default `false`. Si se cambia a `true`, vuelve a llamar `/process` en cada polling para emular cron/worker; útil para debugging, pero puede ocultar que el backend no continuó el pipeline con un solo trigger.
+
 ## Verificación final
 
 - `https://api.caliape.com/` (landing)
