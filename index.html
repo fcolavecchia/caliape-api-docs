@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Caliape Enterprise API</title>
+    <title>Caliape Recorder Integration API</title>
     <link rel="icon" href="/favicon.ico" sizes="any" />
     <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon" />
     <link rel="apple-touch-icon" href="/assets/ios-light.png" />
@@ -119,13 +119,13 @@
   <body>
     <main>
       <header>
-        <h1>Caliape Enterprise API</h1>
-        <p>Documentación oficial para integrar los flujos Enterprise de Caliape: autenticación, procesamiento y resultados con trazabilidad.</p>
+        <h1>Caliape Recorder Integration API</h1>
+        <p>Documentación oficial para integrar Recorder Web con los flujos Enterprise de Caliape: sesiones efímeras, carga de audio, procesamiento y resultados con trazabilidad.</p>
       </header>
 
       <ul>
-        <li>Endpoints seguros para autenticación Enterprise y tokens JWT.</li>
-        <li>Procesamiento de audio y datos con observabilidad y límites por tenant.</li>
+        <li>Endpoints seguros para autenticación Enterprise, tokens JWT y sesiones efímeras de Recorder.</li>
+        <li>Carga de audio, procesamiento de cases y consulta de outputs canónicos por tenant.</li>
         <li>Compatibilidad con entornos productivos y pruebas controladas.</li>
       </ul>
 
@@ -138,7 +138,7 @@
         <div class="card">
           <h2>OpenAPI spec</h2>
           <p>Descargá la especificación pública en YAML.</p>
-          <a href="/spec/">Ver enterprise-api-v1.yaml</a>
+          <a href="/spec/">Ver recorder-api.yaml</a>
         </div>
         <div class="card">
           <h2>Integración</h2>
@@ -150,7 +150,7 @@
 
       <div class="notice">
         <strong>Importante:</strong>
-        <p>Para usar la API necesitás trial keys. Te compartiremos <code>x-enterprise-key</code> y <code>x-enterprise-jwt</code> para pruebas en tu entorno. Sin esas credenciales, las requests devuelven 401/403.</p>
+        <p>Para usar la API necesitás trial keys. Te compartiremos <code>x-enterprise-key</code> y la anon key de Supabase para pruebas en tu entorno. Sin esas credenciales, las requests devuelven 401/403.</p>
         <a class="cta" href="mailto:info@caliape.com">Pedí las trial keys</a>
       </div>
 

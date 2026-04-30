@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Caliape Enterprise API - OpenAPI Spec</title>
+    <title>Caliape Recorder Integration API - OpenAPI Spec</title>
     <link rel="icon" href="/favicon.ico" sizes="any" />
     <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon" />
     <link rel="apple-touch-icon" href="/assets/ios-light.png" />
@@ -80,15 +80,15 @@
   <body>
     <main>
       <h1>OpenAPI spec</h1>
-      <p>Vista del archivo <code>enterprise-api-v1.yaml</code>.</p>
+      <p>Vista del archivo <code>recorder-api.yaml</code>.</p>
       <div class="actions">
         <a class="btn" href="/docs/">Abrir Swagger UI</a>
-        <a class="btn" href="/enterprise-api-v1.yaml" download>Descargar YAML</a>
+        <a class="btn" href="/recorder-api.yaml" download>Descargar YAML</a>
         <a class="btn" href="/">Volver al inicio</a>
       </div>
 
       <section class="panel">
-        <div class="panel-head"><strong>enterprise-api-v1.yaml</strong></div>
+        <div class="panel-head"><strong>recorder-api.yaml</strong></div>
         <pre><code id="yaml-content">Cargando...</code></pre>
       </section>
     </main>
@@ -97,7 +97,7 @@
       async function loadSpec() {
         const content = document.getElementById("yaml-content");
         try {
-          const response = await fetch("/enterprise-api-v1.yaml", { cache: "no-store" });
+          const response = await fetch("/recorder-api.yaml", { cache: "no-store" });
           if (!response.ok) {
             throw new Error("HTTP " + response.status);
           }

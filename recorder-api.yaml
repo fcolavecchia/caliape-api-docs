@@ -1,0 +1,913 @@
+openapi: 3.0.3
+info:
+  title: Caliape Recorder Integration API
+  version: 1.0.0
+  description: |
+    Contrato mínimo para integrar `recorder.caliape.com` y `demo-hce.caliape.com`
+    contra el backend enterprise de Caliape.
+
+    Frontera de seguridad:
+    - La HCE/backend del tenant usa `x-enterprise-jwt` para crear sesiones efímeras.
+    - La HCE/backend también puede usar `x-enterprise-jwt` para crear cases,
+      consultar status/outputs, disparar procesamiento y consultar uso.
+    - El frontend Recorder Web usa únicamente `x-recorder-session-token`.
+    - La API key enterprise nunca debe vivir en el navegador.
+    - `session_token` queda limitado a un `external_case_id`.
+    - `return_origin` queda asociado a la sesión y debe ser usado como destino único de `postMessage`.
+
+    Webhooks enterprise:
+    - La configuración por empresa (`webhook_url`, `webhook_enabled`) se gestiona por backoffice.
+    - Si está habilitada, el backend puede enviar eventos `case.completed` y `case.failed`.
+
+    Supabase Realtime:
+    - `/v1-auth-token` devuelve `realtime_access_token` para suscribirse a canales privados de Broadcast.
+    - El tópico de estado de processing es `case_processing_status:{enterprise_id}:{external_case_id}`.
+    - El evento Broadcast es `case.processing_status.updated`.
+    - Realtime es notificación; `GET /v1-cases/{external_case_id}` sigue siendo la fuente de verdad.
+
+servers:
+  - url: https://cjwyjqklzrufnbtnzxfa.supabase.co/functions/v1
+    description: Supabase Edge Functions
+
+tags:
+  - name: Enterprise auth
+    description: Endpoints server-side para obtener JWT enterprise.
+  - name: Recorder sessions
+    description: Sesiones efímeras para abrir Recorder Web.
+  - name: Recorder cases
+    description: Creación, status y outputs de cases usando session token.
+  - name: Enterprise cases
+    description: Creación, status, procesamiento y outputs de cases usando JWT enterprise.
+  - name: Enterprise usage
+    description: Métricas de consumo mensual por empresa.
+  - name: Legacy processing
+    description: Endpoints legacy síncronos/parciales. Preferir `/v1-cases/{external_case_id}/process`.
+
+components:
+  securitySchemes:
+    SupabaseAnonApiKey:
+      type: apiKey
+      in: header
+      name: apikey
+      description: Supabase anon key requerida por el gateway.
+    SupabaseAnonAuthorization:
+      type: http
+      scheme: bearer
+      bearerFormat: Supabase anon key
+      description: "Header `Authorization: Bearer <SUPABASE_ANON_KEY>`."
+    EnterpriseApiKey:
+      type: apiKey
+      in: header
+      name: x-enterprise-key
+      description: API key enterprise. Sólo server-side.
+    EnterpriseJwt:
+      type: apiKey
+      in: header
+      name: x-enterprise-jwt
+      description: "JWT enterprise obtenido desde `/v1-auth-token`. Sólo server-side."
+    RecorderSessionToken:
+      type: apiKey
+      in: header
+      name: x-recorder-session-token
+      description: Token efímero usado por Recorder Web.
+
+  schemas:
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+
+    AuthTokenResponse:
+      type: object
+      required: [access_token, realtime_access_token, token_type, expires_in, realtime_expires_in]
+      properties:
+        access_token:
+          type: string
+          description: JWT enterprise para llamar Edge Functions con `x-enterprise-jwt`.
+        realtime_access_token:
+          type: string
+          description: JWT Supabase efímero para suscribirse a canales privados de Realtime Broadcast.
+        token_type:
+          type: string
+          enum: [bearer]
+        expires_in:
+          type: integer
+          example: 600
+        realtime_expires_in:
+          type: integer
+          example: 3600
+
+    RecorderSessionCreateRequest:
+      type: object
+      required: [return_origin]
+      properties:
+        return_origin:
+          type: string
+          format: uri
+          example: https://demo-hce.caliape.com
+          description: "Origin autorizado para `postMessage`. Debe ser HTTPS salvo localhost."
+        external_case_id:
+          type: string
+          example: hce_case_123
+          description: ID externo opcional. Si falta, el backend genera uno.
+        expires_in:
+          type: integer
+          minimum: 60
+          maximum: 3600
+          default: 900
+          description: TTL en segundos. El backend limita el valor entre 60 y 3600.
+        metadata:
+          type: object
+          additionalProperties: true
+          description: Metadata opcional para debugging/integración.
+
+    RecorderSessionCreateResponse:
+      type: object
+      required: [session_id, session_token, token_type, expires_in, expires_at, external_case_id, return_origin]
+      properties:
+        session_id:
+          type: string
+          format: uuid
+        session_token:
+          type: string
+          description: Token opaco. Se muestra sólo una vez y debe viajar al Recorder Web.
+        token_type:
+          type: string
+          enum: [recorder_session]
+        expires_in:
+          type: integer
+        expires_at:
+          type: string
+          format: date-time
+        external_case_id:
+          type: string
+        return_origin:
+          type: string
+          format: uri
+        session_url:
+          type: string
+          format: uri
+          nullable: true
+          description: "URL opcional si el backend tiene configurado `RECORDER_WEB_URL`."
+
+    CaseStatus:
+      type: string
+      enum: [created, uploaded, processing, ready, partial_ready, failed]
+
+    OutputStatus:
+      type: string
+      enum: [pending, running, completed, failed]
+
+    OutputStatusDetail:
+      type: object
+      required: [status]
+      properties:
+        status:
+          $ref: '#/components/schemas/OutputStatus'
+        error_message:
+          type: string
+          nullable: true
+        completed_at:
+          type: string
+          format: date-time
+          nullable: true
+        updated_at:
+          type: string
+          format: date-time
+          nullable: true
+
+    CaseOutputsStatusMap:
+      type: object
+      required: [transcript, summary, indications]
+      properties:
+        transcript:
+          $ref: '#/components/schemas/OutputStatusDetail'
+        summary:
+          $ref: '#/components/schemas/OutputStatusDetail'
+        indications:
+          $ref: '#/components/schemas/OutputStatusDetail'
+
+    ProcessingJobSummary:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        job_type:
+          type: string
+          enum: [process_case, transcription, summary, indications, reconcile_case]
+        status:
+          type: string
+          enum: [pending, running, completed, failed]
+        attempt_count:
+          type: integer
+        max_attempts:
+          type: integer
+        last_error:
+          type: string
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+        started_at:
+          type: string
+          format: date-time
+          nullable: true
+        completed_at:
+          type: string
+          format: date-time
+          nullable: true
+        failed_at:
+          type: string
+          format: date-time
+          nullable: true
+
+    CaseJobsStatus:
+      type: object
+      required: [active_count, failed_count, latest]
+      properties:
+        active_count:
+          type: integer
+        failed_count:
+          type: integer
+        latest:
+          type: array
+          items:
+            $ref: '#/components/schemas/ProcessingJobSummary'
+
+    CaseStatusResponse:
+      type: object
+      required: [case_id, external_case_id, status, outputs, jobs, created_at, updated_at]
+      properties:
+        case_id:
+          type: string
+          format: uuid
+        external_case_id:
+          type: string
+        status:
+          $ref: '#/components/schemas/CaseStatus'
+        outputs:
+          $ref: '#/components/schemas/CaseOutputsStatusMap'
+        jobs:
+          $ref: '#/components/schemas/CaseJobsStatus'
+        error_message:
+          type: string
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    CaseCreateJsonAudioUrlRequest:
+      type: object
+      required: [audio_url]
+      properties:
+        external_case_id:
+          type: string
+          description: |
+            Requerido con `x-enterprise-jwt`. Opcional para Recorder Web; si se envía,
+            debe coincidir con la sesión.
+        audio_url:
+          type: string
+          format: uri
+          description: "URL HTTPS al audio. Content-Type debe ser `audio/*` o extensión permitida."
+
+    CaseCreateSignedUploadRequest:
+      type: object
+      required: [filename, content_type]
+      properties:
+        external_case_id:
+          type: string
+          description: |
+            Requerido con `x-enterprise-jwt`. Opcional para Recorder Web; si se envía,
+            debe coincidir con la sesión.
+        filename:
+          type: string
+          example: consultation.mp3
+        content_type:
+          type: string
+          example: audio/mpeg
+        content_length:
+          type: integer
+          description: Tamaño en bytes si se conoce.
+
+    CaseCreateResponse:
+      type: object
+      required: [case_id, external_case_id, status, audio_storage_path]
+      properties:
+        case_id:
+          type: string
+          format: uuid
+        external_case_id:
+          type: string
+        status:
+          $ref: '#/components/schemas/CaseStatus'
+        audio_storage_path:
+          type: string
+        upload_url:
+          type: string
+          format: uri
+          nullable: true
+          description: "URL firmada para signed upload. Presente sólo en modo JSON sin `audio_url`."
+        recorder_session:
+          type: object
+          nullable: true
+          properties:
+            return_origin:
+              type: string
+              format: uri
+            expires_at:
+              type: string
+              format: date-time
+
+    CaseOutputsResponse:
+      type: object
+      required: [transcription, summary, patient_instructions]
+      properties:
+        transcription:
+          type: object
+          nullable: true
+          additionalProperties: true
+        summary:
+          type: object
+          nullable: true
+          additionalProperties: true
+        patient_instructions:
+          type: string
+          nullable: true
+
+    TranscribeRequest:
+      type: object
+      deprecated: true
+      properties:
+        language:
+          type: string
+          default: es
+        model:
+          type: string
+          default: whisper-1
+        temperature:
+          type: number
+        version:
+          type: string
+
+    SummarizeRequest:
+      type: object
+      deprecated: true
+      properties:
+        language:
+          type: string
+          default: es
+        specialty:
+          type: string
+          default: base
+        model:
+          type: string
+          default: gpt-3.5-turbo
+        temperature:
+          type: number
+          default: 0.3
+        max_tokens:
+          type: integer
+          default: 1500
+        version:
+          type: string
+
+    TranscribeResponse:
+      type: object
+      deprecated: true
+      properties:
+        case_id:
+          type: string
+          format: uuid
+        external_case_id:
+          type: string
+        status:
+          type: string
+        transcription_ready:
+          type: boolean
+
+    SummarizeResponse:
+      type: object
+      deprecated: true
+      properties:
+        case_id:
+          type: string
+          format: uuid
+        external_case_id:
+          type: string
+        status:
+          type: string
+
+    UsageResponse:
+      type: object
+      required: [period, case_count]
+      properties:
+        period:
+          type: string
+          example: "2026-01"
+        case_count:
+          type: integer
+          example: 12
+
+    CaseProcessRequest:
+      type: object
+      properties:
+        batch_size:
+          type: integer
+          minimum: 1
+          maximum: 10
+          default: 5
+          description: |
+            Tamaño máximo del batch que la función pública le pide al worker interno.
+            El backend limita el valor entre 1 y 10.
+
+    CaseProcessWorkerResult:
+      type: object
+      properties:
+        job_id:
+          type: string
+          format: uuid
+        case_id:
+          type: string
+          format: uuid
+        job_type:
+          type: string
+          enum: [process_case, transcription, summary, indications, reconcile_case]
+        status:
+          type: string
+          description: |
+            Resultado de esta invocación del worker. Puede ser `completed`, `failed`,
+            `skipped_running`, `skipped_failed` o `skipped_completed`.
+        error:
+          type: string
+          nullable: true
+
+    CaseProcessWorkerResponse:
+      type: object
+      properties:
+        processed:
+          type: integer
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/CaseProcessWorkerResult'
+
+    CaseProcessResponse:
+      type: object
+      required: [case_id, external_case_id, status, triggered]
+      properties:
+        case_id:
+          type: string
+          format: uuid
+        external_case_id:
+          type: string
+        status:
+          $ref: '#/components/schemas/CaseStatus'
+        triggered:
+          type: boolean
+          description: |
+            `true` significa que la API aceptó el trigger e invocó el worker interno.
+            No significa que el procesamiento clínico haya terminado correctamente.
+            La fuente de verdad del estado final es `GET /v1-cases/{external_case_id}`.
+        enqueued_job_ids:
+          type: array
+          items:
+            type: string
+            format: uuid
+          description: Jobs creados por este trigger cuando no había jobs activos.
+        worker:
+          $ref: '#/components/schemas/CaseProcessWorkerResponse'
+
+paths:
+  /v1-auth-token:
+    post:
+      tags: [Enterprise auth]
+      summary: Intercambiar API key enterprise por JWT enterprise
+      description: |
+        Este endpoint debe ser llamado sólo desde backend/serverless de la HCE o demo.
+        No debe ejecutarse desde el navegador.
+      security:
+        - SupabaseAnonApiKey: []
+          SupabaseAnonAuthorization: []
+          EnterpriseApiKey: []
+      responses:
+        '200':
+          description: JWT enterprise generado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthTokenResponse'
+        '401':
+          description: API key inválida o faltante
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Enterprise suspendido
+        '404':
+          description: Enterprise no encontrado
+        '500':
+          description: Error interno
+
+  /v1-recorder-sessions:
+    post:
+      tags: [Recorder sessions]
+      summary: Crear sesión efímera para Recorder Web
+      description: |
+        Lo llama el backend de la HCE/demo con `x-enterprise-jwt`.
+        Devuelve un `session_token` opaco que puede pasarse al Recorder Web.
+      security:
+        - SupabaseAnonApiKey: []
+          SupabaseAnonAuthorization: []
+          EnterpriseJwt: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RecorderSessionCreateRequest'
+      responses:
+        '201':
+          description: Sesión creada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RecorderSessionCreateResponse'
+        '400':
+          description: "`return_origin` faltante o inválido"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: JWT enterprise inválido o faltante
+        '500':
+          description: Error interno
+
+  /v1-cases:
+    post:
+      tags: [Recorder cases, Enterprise cases]
+      summary: Crear case y subir audio
+      description: |
+        Lo llama Recorder Web desde el navegador usando `x-recorder-session-token`,
+        o la HCE/backend del tenant usando `x-enterprise-jwt`.
+
+        Soporta:
+        - `multipart/form-data` con archivo `audio` (máximo 6MB).
+        - `application/json` con `audio_url`.
+        - `application/json` con metadata para obtener `upload_url` firmado.
+
+        Con `x-enterprise-jwt`, `external_case_id` es requerido.
+        Con `x-recorder-session-token`, si se envía `external_case_id`, debe coincidir
+        con el asociado al session token. Si se omite, el backend usa el de la sesión.
+      security:
+        - SupabaseAnonApiKey: []
+          SupabaseAnonAuthorization: []
+          RecorderSessionToken: []
+        - SupabaseAnonApiKey: []
+          SupabaseAnonAuthorization: []
+          EnterpriseJwt: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [audio]
+              properties:
+                audio:
+                  type: string
+                  format: binary
+                  description: Archivo de audio. Máximo 6MB.
+                external_case_id:
+                  type: string
+                  description: Opcional. Si se envía, debe coincidir con la sesión.
+          application/json:
+            schema:
+              oneOf:
+                - $ref: '#/components/schemas/CaseCreateJsonAudioUrlRequest'
+                - $ref: '#/components/schemas/CaseCreateSignedUploadRequest'
+      responses:
+        '201':
+          description: Case creado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CaseCreateResponse'
+        '200':
+          description: "Idempotencia, case ya existente para ese `external_case_id`"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CaseCreateResponse'
+        '400':
+          description: Request inválido
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Session token inválido o expirado
+        '403':
+          description: "`external_case_id` no coincide con la sesión"
+        '413':
+          description: Archivo demasiado grande
+        '415':
+          description: Content-Type no soportado
+        '502':
+          description: "No se pudo descargar `audio_url`"
+        '500':
+          description: Error interno
+
+  /v1-cases/{external_case_id}:
+    get:
+      tags: [Recorder cases]
+      summary: Consultar status detallado del case
+      description: |
+        Usable por Recorder Web con `x-recorder-session-token` o por la HCE/backend
+        del tenant con `x-enterprise-jwt`.
+
+        Si se usa `x-recorder-session-token`, el token sólo puede consultar su propio
+        `external_case_id`.
+      security:
+        - SupabaseAnonApiKey: []
+          SupabaseAnonAuthorization: []
+          RecorderSessionToken: []
+        - SupabaseAnonApiKey: []
+          SupabaseAnonAuthorization: []
+          EnterpriseJwt: []
+      parameters:
+        - in: path
+          name: external_case_id
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Status agregado, detalle por output y últimos jobs
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CaseStatusResponse'
+        '403':
+          description: El session token no puede consultar este case
+        '404':
+          description: Case no encontrado
+        '500':
+          description: Error interno
+
+  /v1-cases/{external_case_id}/process:
+    post:
+      tags: [Recorder cases]
+      summary: Disparar procesamiento backend de un case
+      description: |
+        Despierta el worker interno de procesamiento para un case que ya tiene audio
+        final registrado. Este endpoint es una fachada pública segura: el cliente no
+        recibe ni envía `PROCESS_CASE_QUEUE_WORKER_SECRET`.
+
+        Importante: una respuesta `202` significa que el trigger fue aceptado y que
+        el worker interno fue invocado. No significa que el procesamiento clínico haya
+        finalizado exitosamente. El cliente debe consultar
+        `GET /v1-cases/{external_case_id}` para conocer el estado agregado y los
+        estados por output.
+
+        Si el worker encuentra un fallo transitorio, por ejemplo un timeout de OpenAI
+        o un problema temporal de storage, el endpoint puede responder `202` con un
+        resultado `worker.results[].status = failed`; el case normalmente seguirá en
+        `processing` y el job volverá a `pending` hasta agotar retries. Si la
+        transcripción agota retries, el case pasa a `failed`. Si falla definitivamente
+        `summary` o `indications` pero existe transcript usable, el case puede pasar a
+        `partial_ready`.
+      security:
+        - SupabaseAnonApiKey: []
+          SupabaseAnonAuthorization: []
+          RecorderSessionToken: []
+        - SupabaseAnonApiKey: []
+          SupabaseAnonAuthorization: []
+          EnterpriseJwt: []
+      parameters:
+        - in: path
+          name: external_case_id
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CaseProcessRequest'
+      responses:
+        '202':
+          description: Trigger aceptado; el worker interno fue invocado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CaseProcessResponse'
+        '200':
+          description: Case ya estaba en estado terminal usable y no se disparó worker
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CaseProcessResponse'
+        '403':
+          description: El session token no puede procesar este case
+        '404':
+          description: Case no encontrado
+        '409':
+          description: Case todavía no tiene audio final disponible para procesamiento
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Error interno
+
+  /v1-transcribe-case/{external_case_id}:
+    post:
+      tags: [Legacy processing]
+      summary: Transcribir audio del caso
+      deprecated: true
+      description: |
+        Endpoint legacy para ejecutar transcripción de forma directa.
+        Para el pipeline backend actual, preferir
+        `POST /v1-cases/{external_case_id}/process`.
+      security:
+        - SupabaseAnonApiKey: []
+          SupabaseAnonAuthorization: []
+          EnterpriseJwt: []
+      parameters:
+        - in: path
+          name: external_case_id
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TranscribeRequest'
+      responses:
+        '200':
+          description: Transcripción lista o generada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TranscribeResponse'
+        '202':
+          description: Transcripción en progreso
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TranscribeResponse'
+        '400':
+          description: "`external_case_id` faltante"
+        '403':
+          description: "`audio_storage_path` no pertenece al tenant"
+        '404':
+          description: Case no encontrado
+        '409':
+          description: Conflicto por estado inválido
+        '429':
+          description: Límite mensual excedido
+        '502':
+          description: Error descargando audio
+        '500':
+          description: Error interno
+
+  /v1-summarize-case/{external_case_id}:
+    post:
+      tags: [Legacy processing]
+      summary: Generar resumen del caso
+      deprecated: true
+      description: |
+        Endpoint legacy para ejecutar resumen/indicaciones de forma directa.
+        Para el pipeline backend actual, preferir
+        `POST /v1-cases/{external_case_id}/process`.
+      security:
+        - SupabaseAnonApiKey: []
+          SupabaseAnonAuthorization: []
+          EnterpriseJwt: []
+      parameters:
+        - in: path
+          name: external_case_id
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SummarizeRequest'
+      responses:
+        '200':
+          description: Resumen listo o generado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SummarizeResponse'
+        '202':
+          description: Resumen en progreso
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SummarizeResponse'
+        '400':
+          description: "`external_case_id` faltante"
+        '404':
+          description: Case no encontrado
+        '409':
+          description: Transcripción requerida
+        '429':
+          description: Límite mensual excedido
+        '500':
+          description: Error interno
+
+  /v1-usage:
+    get:
+      tags: [Enterprise usage]
+      summary: Obtener uso mensual
+      description: |
+        Devuelve el conteo de casos para un período. No expone costos al cliente.
+      security:
+        - SupabaseAnonApiKey: []
+          SupabaseAnonAuthorization: []
+          EnterpriseJwt: []
+      parameters:
+        - in: query
+          name: month
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 12
+          description: Mes, de 1 a 12.
+        - in: query
+          name: year
+          required: false
+          schema:
+            type: integer
+          description: Año. Si falta, usa el año actual UTC.
+      responses:
+        '200':
+          description: Uso mensual
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UsageResponse'
+        '400':
+          description: Parámetros inválidos
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: JWT inválido o faltante
+        '405':
+          description: Método no permitido
+        '500':
+          description: Error interno
+
+  /v1-cases/{external_case_id}/outputs:
+    get:
+      tags: [Recorder cases]
+      summary: Obtener outputs canónicos del case
+      description: |
+        Devuelve transcript, summary e indications cuando existan.
+        Puede responder 404 mientras el procesamiento todavía no produjo outputs.
+
+        Usable por Recorder Web con `x-recorder-session-token` o por la HCE/backend
+        del tenant con `x-enterprise-jwt`.
+      security:
+        - SupabaseAnonApiKey: []
+          SupabaseAnonAuthorization: []
+          RecorderSessionToken: []
+        - SupabaseAnonApiKey: []
+          SupabaseAnonAuthorization: []
+          EnterpriseJwt: []
+      parameters:
+        - in: path
+          name: external_case_id
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Outputs disponibles
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CaseOutputsResponse'
+        '403':
+          description: El session token no puede consultar este case
+        '404':
+          description: Case u outputs no encontrados
+        '500':
+          description: Error interno

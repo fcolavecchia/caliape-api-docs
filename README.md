@@ -1,12 +1,12 @@
-# Caliape Enterprise API Docs
+# Caliape Recorder Integration API Docs
 
-Este repositorio publica la documentación de la Enterprise API en GitHub Pages.
+Este repositorio publica la documentación de la Recorder Integration API en GitHub Pages.
 
 ## Estructura
 
 - `index.html`: landing pública.
-- `enterprise-api-v1.yaml`: especificación OpenAPI (sin credenciales).
-- `docs/`: Swagger UI configurado para cargar `../enterprise-api-v1.yaml`.
+- `recorder-api.yaml`: especificación OpenAPI (sin credenciales).
+- `docs/`: Swagger UI configurado para cargar `../recorder-api.yaml`.
 
 > Nota: actualmente Swagger UI se carga desde CDN para simplificar el despliegue. Si necesitás
 > servir los assets locales, descargá los archivos `dist` de Swagger UI y reemplazá los links
@@ -35,16 +35,12 @@ Este repositorio publica la documentación de la Enterprise API en GitHub Pages.
 ## Verificación final
 
 - `https://api.caliape.com/` (landing)
-<<<<<<< codex/implement-documentation-for-enterprise-api-i5b2kx
-- `https://api.caliape.com/enterprise-api-v1.yaml` (spec)
-- `https://api.caliape.com/docs/` (Swagger UI)
-=======
-- `https://api.caliape.com/enterprise-api-v1.yaml` (spec)
+- `https://api.caliape.com/recorder-api.yaml` (spec)
 - `https://api.caliape.com/swagger/` (Swagger UI)
->>>>>>> main
 
 ## Onboarding rápido (referencia)
 
-1. Obtener JWT en `/auth/jwt` usando `x-enterprise-key`.
-2. Usar `x-enterprise-jwt` en todos los endpoints.
-3. Sin headers válidos, las requests deben fallar con 401/403.
+1. Obtener JWT en `/v1-auth-token` usando `x-enterprise-key`.
+2. Crear sesiones efímeras en `/v1-recorder-sessions` cuando el flujo use Recorder Web.
+3. Usar `x-enterprise-jwt` server-side o `x-recorder-session-token` desde Recorder Web según corresponda.
+4. Sin headers válidos, las requests deben fallar con 401/403.
