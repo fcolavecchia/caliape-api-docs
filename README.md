@@ -50,12 +50,14 @@ El script valida que el YAML sea parseable, que las referencias locales existan,
 Configurar `.env` con credenciales reales y una `AUDIO_URL` HTTPS alcanzable por el backend. `RETURN_ORIGIN` puede quedar como `http://localhost:3000`: no se contacta por red, sólo se valida que el backend lo asocie a la sesión. El archivo local queda ignorado por git; `.env.example` documenta las variables.
 
 ```sh
-scripts/test-endpoints.sh
+bash scripts/test-endpoints.sh
 python3 scripts/test-endpoints.py
 node --experimental-strip-types scripts/test-endpoints.ts
 ```
 
-Los scripts recorren todos los endpoints de la spec usando un `external_case_id` único si no se define `EXTERNAL_CASE_ID`. También verifican que `/v1-recorder-sessions` devuelva el mismo `RETURN_ORIGIN` enviado y, con `RUN_NEGATIVE_TESTS=true`, que rechace un origin inválido. `RUN_PROCESSING_ENDPOINTS` y `RUN_LEGACY_ENDPOINTS` permiten desactivar llamadas que pueden disparar procesamiento/consumo.
+Los scripts recorren todos los endpoints de la spec usando un `external_case_id` único si no se define `EXTERNAL_CASE_ID`. Son smoke tests de endpoints: validan autenticación, headers, payloads, status HTTP esperados y errores básicos, pero no esperan ni validan la finalización del procesamiento clínico asincrónico.
+
+También verifican que `/v1-recorder-sessions` devuelva el mismo `RETURN_ORIGIN` enviado y, con `RUN_NEGATIVE_TESTS=true`, que rechace un origin inválido. `RUN_PROCESSING_ENDPOINTS` y `RUN_LEGACY_ENDPOINTS` permiten desactivar llamadas que pueden disparar procesamiento/consumo.
 
 ## Verificación final
 

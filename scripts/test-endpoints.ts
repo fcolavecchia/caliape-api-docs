@@ -13,7 +13,7 @@ function loadEnv(path: string): void {
     if (!line || line.startsWith("#") || !line.includes("=")) continue;
 
     const [key, ...valueParts] = line.split("=");
-    const value = valueParts.join("=").trim().replace(/^["']|["']$/g, "");
+    const value = valueParts.join("=").trim().replace(/^["']+|["']+$/g, "");
     process.env[key.trim()] ??= value;
   }
 }
@@ -68,6 +68,21 @@ async function requestJson(
   }
 }
 
+async function validateAudioUrl(audioUrl: string): Promise<void> {
+  const response = await fetch(audioUrl, { method: "HEAD", redirect: "follow" });
+  const contentType = response.headers.get("content-type") || "";
+  console.log(`OK AUDIO_URL -> HTTP ${response.status}, Content-Type: ${contentType}`);
+
+  if (!response.ok) {
+    console.error(`FAIL AUDIO_URL -> HTTP ${response.status}`);
+    process.exit(1);
+  }
+  if (!contentType.startsWith("audio/")) {
+    console.error(`FAIL AUDIO_URL debe responder Content-Type audio/*, recibido: ${contentType}`);
+    process.exit(1);
+  }
+}
+
 loadEnv(resolve(root, ".env"));
 
 const baseUrl = (process.env.BASE_URL || "https://cjwyjqklzrufnbtnzxfa.supabase.co/functions/v1").replace(/\/$/, "");
@@ -86,6 +101,8 @@ const anonHeaders = {
   apikey: supabaseAnonKey,
   Authorization: `Bearer ${supabaseAnonKey}`,
 };
+
+await validateAudioUrl(audioUrl);
 
 const auth = await requestJson(
   "POST",
@@ -179,4 +196,5 @@ await requestJson(
 );
 await requestJson("GET", `${baseUrl}/v1-cases/${externalCaseId}/outputs`, enterpriseHeaders, undefined, [200, 404]);
 
-console.log(`Smoke test completo para external_case_id=${externalCaseId}`);
+console.log(`Smoke test de endpoints completo para external_case_id=${externalCaseId}`);
+console.log("Nota: este test no espera ni valida la finalizacion del procesamiento clinico asincronico.");

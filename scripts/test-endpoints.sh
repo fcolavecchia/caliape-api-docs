@@ -49,7 +49,7 @@ assert_equal() {
     echo "FAIL ${label}: esperado '${expected}', recibido '${actual}'" >&2
     exit 1
   fi
-  echo "OK ${label}"
+  echo "OK ${label}" >&2
 }
 
 request_json() {
@@ -69,7 +69,7 @@ request_json() {
   payload="$(printf '%s' "${response}" | sed '$d')"
 
   if [[ ",${expected_csv}," == *",${status},"* ]]; then
-    echo "OK ${method} ${url} -> HTTP ${status}"
+    echo "OK ${method} ${url} -> HTTP ${status}" >&2
   else
     echo "FAIL ${method} ${url} -> HTTP ${status}" >&2
     printf '%s\n' "${payload}" >&2
@@ -79,9 +79,28 @@ request_json() {
   printf '%s' "${payload}"
 }
 
+validate_audio_url() {
+  local headers status content_type
+  headers="$(curl -sS -L -I "${AUDIO_URL}")"
+  status="$(printf '%s\n' "${headers}" | awk 'toupper($0) ~ /^HTTP\// { code=$2 } END { print code }')"
+  content_type="$(printf '%s\n' "${headers}" | awk 'BEGIN { IGNORECASE=1 } /^content-type:/ { value=$0; sub(/^[^:]+:[[:space:]]*/, "", value) } END { print value }' | tr -d '\r')"
+
+  if [[ "${status}" != "200" ]]; then
+    echo "FAIL AUDIO_URL -> HTTP ${status}" >&2
+    exit 1
+  fi
+  echo "OK AUDIO_URL -> HTTP ${status}, Content-Type: ${content_type}" >&2
+
+  if [[ "${content_type}" != audio/* ]]; then
+    echo "FAIL AUDIO_URL debe responder Content-Type audio/*, recibido: ${content_type}" >&2
+    exit 1
+  fi
+}
+
 require_env SUPABASE_ANON_KEY
 require_env ENTERPRISE_API_KEY
 require_env AUDIO_URL
+validate_audio_url
 
 AUTH_RESPONSE="$(
   request_json POST "${BASE_URL}/v1-auth-token" "200" "" \
@@ -162,4 +181,5 @@ request_json GET "${BASE_URL}/v1-cases/${EXTERNAL_CASE_ID}/outputs" "200,404" ""
   -H "apikey: ${SUPABASE_ANON_KEY}" \
   -H "Authorization: Bearer ${SUPABASE_ANON_KEY}" >/dev/null
 
-echo "Smoke test completo para external_case_id=${EXTERNAL_CASE_ID}"
+echo "Smoke test de endpoints completo para external_case_id=${EXTERNAL_CASE_ID}"
+echo "Nota: este test no espera ni valida la finalizacion del procesamiento clinico asincronico."

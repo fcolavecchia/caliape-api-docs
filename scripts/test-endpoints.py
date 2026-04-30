@@ -73,6 +73,19 @@ def request_json(method, url, headers=None, body=None, expected=(200,)):
         return {"raw": response_body}
 
 
+def validate_audio_url(audio_url):
+    request = urllib.request.Request(audio_url, method="HEAD")
+    try:
+        with urllib.request.urlopen(request, timeout=30) as response:
+            content_type = response.headers.get("Content-Type", "")
+            print(f"OK AUDIO_URL -> HTTP {response.status}, Content-Type: {content_type}")
+    except urllib.error.HTTPError as error:
+        raise SystemExit(f"FAIL AUDIO_URL -> HTTP {error.code}")
+
+    if not content_type.startswith("audio/"):
+        raise SystemExit(f"FAIL AUDIO_URL debe responder Content-Type audio/*, recibido: {content_type}")
+
+
 def main():
     load_env(ROOT / ".env")
 
@@ -87,6 +100,7 @@ def main():
     run_processing = truthy(os.environ.get("RUN_PROCESSING_ENDPOINTS", "true"))
     run_legacy = truthy(os.environ.get("RUN_LEGACY_ENDPOINTS", "true"))
     run_negative = truthy(os.environ.get("RUN_NEGATIVE_TESTS", "true"))
+    validate_audio_url(audio_url)
 
     anon_headers = {
         "apikey": supabase_anon_key,
@@ -182,7 +196,8 @@ def main():
         expected=(200, 404),
     )
 
-    print(f"Smoke test completo para external_case_id={external_case_id}")
+    print(f"Smoke test de endpoints completo para external_case_id={external_case_id}")
+    print("Nota: este test no espera ni valida la finalizacion del procesamiento clinico asincronico.")
 
 
 if __name__ == "__main__":
