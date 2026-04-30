@@ -11,6 +11,11 @@ SPEC_PATH = File.join(ROOT, "recorder-api.yaml")
 EXAMPLES_PATH = File.join(ROOT, "ejemplos", "codeExamplesByOperation.js")
 DOCS_INDEX_PATH = File.join(ROOT, "docs", "index.html")
 SPEC_INDEX_PATH = File.join(ROOT, "spec", "index.html")
+SMOKE_TEST_SCRIPTS = [
+  File.join(ROOT, "scripts", "test-endpoints.sh"),
+  File.join(ROOT, "scripts", "test-endpoints.py"),
+  File.join(ROOT, "scripts", "test-endpoints.ts")
+].freeze
 
 errors = []
 
@@ -144,6 +149,21 @@ end
 stdout, stderr, status = Open3.capture3("node", "--check", EXAMPLES_PATH)
 unless status.success?
   fail_with(errors, "ejemplos/codeExamplesByOperation.js no pasa node --check:\n#{stdout}#{stderr}")
+end
+
+stdout, stderr, status = Open3.capture3("bash", "-n", SMOKE_TEST_SCRIPTS[0])
+unless status.success?
+  fail_with(errors, "scripts/test-endpoints.sh no pasa bash -n:\n#{stdout}#{stderr}")
+end
+
+stdout, stderr, status = Open3.capture3("python3", "-m", "py_compile", SMOKE_TEST_SCRIPTS[1])
+unless status.success?
+  fail_with(errors, "scripts/test-endpoints.py no pasa py_compile:\n#{stdout}#{stderr}")
+end
+
+stdout, stderr, status = Open3.capture3("node", "--experimental-strip-types", "--check", SMOKE_TEST_SCRIPTS[2])
+unless status.success?
+  fail_with(errors, "scripts/test-endpoints.ts no pasa node --check:\n#{stdout}#{stderr}")
 end
 
 if errors.empty?
