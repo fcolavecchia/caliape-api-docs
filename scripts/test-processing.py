@@ -10,6 +10,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 TERMINAL_STATUSES = {"ready", "partial_ready", "failed"}
+COMPLETED_OUTPUT_STATUSES = {"completed"}
 
 
 def load_env(path):
@@ -90,6 +91,15 @@ def assert_outputs_shape(outputs):
     print("OK outputs con estructura minima")
 
 
+def output_status(outputs_status, name):
+    output = outputs_status.get(name)
+    if isinstance(output, dict):
+        return output.get("status")
+    if isinstance(output, str):
+        return output
+    return None
+
+
 def main():
     load_env(ROOT / ".env")
 
@@ -101,6 +111,7 @@ def main():
     timeout_seconds = int(os.environ.get("PROCESSING_TIMEOUT_SECONDS", "300"))
     poll_seconds = int(os.environ.get("PROCESSING_POLL_SECONDS", "10"))
     trigger_each_poll = truthy(os.environ.get("PROCESSING_TRIGGER_EACH_POLL", "false"))
+    retrigger_on_transcript = truthy(os.environ.get("PROCESSING_RETRIGGER_ON_TRANSCRIPT", "true"))
 
     validate_audio_url(audio_url)
 
@@ -139,6 +150,7 @@ def main():
     deadline = time.monotonic() + timeout_seconds
     last_status = None
     case_status = {}
+    transcript_retriggered = False
     while time.monotonic() < deadline:
         case_status = request_json(
             "GET",
@@ -163,6 +175,16 @@ def main():
         if last_status in TERMINAL_STATUSES:
             break
 
+        transcript_status = output_status(outputs_status, "transcript")
+        if (
+            retrigger_on_transcript
+            and not transcript_retriggered
+            and transcript_status in COMPLETED_OUTPUT_STATUSES
+        ):
+            print("Transcript terminado; relanzando process para summary/indications...")
+            trigger_processing()
+            transcript_retriggered = True
+
         if trigger_each_poll:
             print("Reintentando trigger de procesamiento para emular cron/worker...")
             trigger_processing()
@@ -172,8 +194,9 @@ def main():
     if last_status not in TERMINAL_STATUSES:
         raise SystemExit(
             f"FAIL procesamiento no llego a estado terminal en {timeout_seconds}s "
-            f"(ultimo status: {last_status}). Si PROCESSING_TRIGGER_EACH_POLL=false, "
-            "asegurate de tener cron/workers activos."
+            f"(ultimo status: {last_status}). Si no hay cron activo, el test relanza "
+            "automaticamente cuando transcript queda completed; para reintentar en cada poll "
+            "usa PROCESSING_TRIGGER_EACH_POLL=true."
         )
 
     if last_status == "failed":

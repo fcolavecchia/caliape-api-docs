@@ -449,6 +449,12 @@ components:
     CaseProcessWorkerResponse:
       type: object
       properties:
+        batches:
+          type: integer
+          description: |
+            Cantidad de tandas que procesó el worker en esta invocación interna.
+            `/process` público usa una tanda liviana por default; jobs hijos recién encolados
+            pueden requerir cron o un nuevo trigger idempotente.
         processed:
           type: integer
         results:
