@@ -14,23 +14,36 @@ Este repositorio publica la documentación de la Recorder Integration API en Git
 
 ## Checklist de publicación
 
-1. **GitHub Pages**
+1. **Actualizar spec y ejemplos**
+   - Reemplazar `recorder-api.yaml`.
+   - Actualizar `ejemplos/codeExamplesByOperation.js` con snippets para todos los endpoints.
+   - Correr `ruby scripts/validate-docs.rb`.
+
+2. **GitHub Pages**
    - Settings → Pages → Source: Deploy from a branch.
    - Branch: `main` / Folder: `/ (root)`.
    - Guardar y esperar la URL temporal `https://<org>.github.io/<repo>/`.
 
-2. **Custom domain**
+3. **Custom domain**
    - Settings → Pages → Custom domain → `api.caliape.com`.
    - Verificar que se haya creado el archivo `CNAME` en el repo.
 
-3. **DNS**
+4. **DNS**
    - Crear registro CNAME:
      - Host/Name: `api`
      - Target/Value: `<org>.github.io`
    - Esperar propagación.
 
-4. **HTTPS**
+5. **HTTPS**
    - Volver a Settings → Pages y habilitar **Enforce HTTPS** cuando esté disponible.
+
+## Validación local
+
+```sh
+ruby scripts/validate-docs.rb
+```
+
+El script valida que el YAML sea parseable, que las referencias locales existan, que Swagger UI cargue `recorder-api.yaml`, que los ejemplos JS sean sintácticamente válidos y que cada operación de la spec tenga snippets en curl, Python y TypeScript.
 
 ## Verificación final
 
