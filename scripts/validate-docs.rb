@@ -2,6 +2,7 @@
 # frozen_string_literal: true
 
 require "open3"
+require "fileutils"
 require "json"
 require "set"
 require "yaml"
@@ -17,6 +18,7 @@ SMOKE_TEST_SCRIPTS = [
   File.join(ROOT, "scripts", "test-endpoints.ts"),
   File.join(ROOT, "scripts", "test-processing.py")
 ].freeze
+PYTHON_CACHE_DIR = File.join(ROOT, ".python-pycache")
 
 errors = []
 
@@ -157,7 +159,15 @@ unless status.success?
   fail_with(errors, "scripts/test-endpoints.sh no pasa bash -n:\n#{stdout}#{stderr}")
 end
 
-stdout, stderr, status = Open3.capture3("python3", "-m", "py_compile", SMOKE_TEST_SCRIPTS[1], SMOKE_TEST_SCRIPTS[3])
+FileUtils.mkdir_p(PYTHON_CACHE_DIR)
+stdout, stderr, status = Open3.capture3(
+  { "PYTHONPYCACHEPREFIX" => PYTHON_CACHE_DIR },
+  "python3",
+  "-m",
+  "py_compile",
+  SMOKE_TEST_SCRIPTS[1],
+  SMOKE_TEST_SCRIPTS[3]
+)
 unless status.success?
   fail_with(errors, "scripts/test-endpoints.py o scripts/test-processing.py no pasa py_compile:\n#{stdout}#{stderr}")
 end

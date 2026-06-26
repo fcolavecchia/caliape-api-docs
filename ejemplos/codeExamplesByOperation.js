@@ -135,6 +135,42 @@ const response = await fetch(baseUrl + "/v1-cases", {
 if (!response.ok) throw new Error(await response.text());
 console.log(await response.json());`,
   },
+  "POST /v1-cases/{external_case_id}/upload-complete": {
+    curl: `curl -X POST "https://cjwyjqklzrufnbtnzxfa.supabase.co/functions/v1/v1-cases/CASE-123/upload-complete" \\
+  -H "x-enterprise-jwt: YOUR_ENTERPRISE_JWT" \\
+  -H "apikey: YOUR_SUPABASE_ANON_KEY" \\
+  -H "Authorization: Bearer YOUR_SUPABASE_ANON_KEY"`,
+    python: `import requests
+
+base_url = "https://cjwyjqklzrufnbtnzxfa.supabase.co/functions/v1"
+external_case_id = "CASE-123"
+
+response = requests.post(
+    f"{base_url}/v1-cases/{external_case_id}/upload-complete",
+    headers={
+        "x-enterprise-jwt": "YOUR_ENTERPRISE_JWT",
+        "apikey": "YOUR_SUPABASE_ANON_KEY",
+        "Authorization": "Bearer YOUR_SUPABASE_ANON_KEY",
+    },
+    timeout=60,
+)
+response.raise_for_status()
+print(response.json())`,
+    typescript: `const baseUrl = "https://cjwyjqklzrufnbtnzxfa.supabase.co/functions/v1";
+const externalCaseId = "CASE-123";
+
+const response = await fetch(baseUrl + "/v1-cases/" + externalCaseId + "/upload-complete", {
+  method: "POST",
+  headers: {
+    "x-enterprise-jwt": "YOUR_ENTERPRISE_JWT",
+    apikey: "YOUR_SUPABASE_ANON_KEY",
+    Authorization: "Bearer YOUR_SUPABASE_ANON_KEY",
+  },
+});
+
+if (!response.ok) throw new Error(await response.text());
+console.log(await response.json());`,
+  },
   "GET /v1-cases/{external_case_id}": {
     curl: `curl "https://cjwyjqklzrufnbtnzxfa.supabase.co/functions/v1/v1-cases/CASE-123" \\
   -H "x-enterprise-jwt: YOUR_ENTERPRISE_JWT" \\
