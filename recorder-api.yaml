@@ -338,6 +338,13 @@ components:
         patient_instructions:
           type: string
           nullable: true
+        model_info:
+          type: object
+          nullable: true
+          additionalProperties: true
+          description: |
+            Metadata opcional de los modelos usados para generar los outputs
+            (por ejemplo modelo de transcripción y resumen). Puede ser `null`.
 
     TranscribeRequest:
       type: object
@@ -422,8 +429,17 @@ components:
           maximum: 10
           default: 5
           description: |
-            Tamaño máximo del batch que la función pública le pide al worker interno.
-            El backend limita el valor entre 1 y 10.
+            Tamaño máximo del batch que la función pública le pide al worker interno
+            cuando `run_worker` es `true`. El backend limita el valor entre 1 y 10.
+        run_worker:
+          type: boolean
+          default: false
+          description: |
+            Si es `true`, además de encolar los jobs la función invoca de forma
+            síncrona al worker interno (una tanda liviana) antes de responder.
+            Si es `false` (default), la función sólo encola los jobs y el
+            procesamiento corre de forma asíncrona vía cron/worker. En ese caso
+            `worker_invoked` será `false` y `worker` será `null`.
 
     CaseProcessWorkerResult:
       type: object
@@ -476,17 +492,58 @@ components:
         triggered:
           type: boolean
           description: |
-            `true` significa que la API aceptó el trigger e invocó el worker interno.
-            No significa que el procesamiento clínico haya terminado correctamente.
-            La fuente de verdad del estado final es `GET /v1-cases/{external_case_id}`.
+            `true` significa que la API aceptó el trigger y encoló (o confirmó) el
+            procesamiento del case. No significa que el procesamiento clínico haya
+            terminado correctamente. La fuente de verdad del estado final es
+            `GET /v1-cases/{external_case_id}`.
         enqueued_job_ids:
           type: array
           items:
             type: string
             format: uuid
           description: Jobs creados por este trigger cuando no había jobs activos.
+        worker_invoked:
+          type: boolean
+          description: |
+            `true` si la función invocó síncronamente al worker interno en esta
+            llamada (sólo cuando el request trae `run_worker: true`). Si es `false`,
+            el procesamiento corre de forma asíncrona y `worker` es `null`.
         worker:
-          $ref: '#/components/schemas/CaseProcessWorkerResponse'
+          allOf:
+            - $ref: '#/components/schemas/CaseProcessWorkerResponse'
+          nullable: true
+          description: |
+            Resultado de la invocación síncrona del worker. Presente sólo cuando
+            `worker_invoked` es `true`; en caso contrario es `null`.
+
+    CaseUploadCompleteResponse:
+      type: object
+      required: [case_id, external_case_id, status, completed]
+      properties:
+        case_id:
+          type: string
+          format: uuid
+        external_case_id:
+          type: string
+        status:
+          $ref: '#/components/schemas/CaseStatus'
+        completed:
+          type: boolean
+          description: |
+            `true` si esta llamada registró el audio firmado y movió el case a
+            `uploaded`. `false` si el case ya no estaba en `created` (idempotencia);
+            en ese caso `status` refleja el estado actual y no se reencola nada.
+        enqueued_job_id:
+          type: string
+          format: uuid
+          nullable: true
+          description: Job de transcripción encolado por esta llamada, si corresponde.
+        worker_wake_scheduled:
+          type: boolean
+          description: |
+            `true` si la función disparó un despertar del worker interno tras
+            registrar el audio. Es best-effort; la fuente de verdad sigue siendo
+            `GET /v1-cases/{external_case_id}`.
 
 paths:
   /v1-auth-token:
@@ -564,9 +621,18 @@ paths:
         o la HCE/backend del tenant usando `x-enterprise-jwt`.
 
         Soporta:
-        - `multipart/form-data` con archivo `audio` (máximo 6MB).
+        - `multipart/form-data` con archivo `audio` (máximo 6MB de subida directa).
         - `application/json` con `audio_url`.
-        - `application/json` con metadata para obtener `upload_url` firmado.
+        - `application/json` con metadata (`filename`/`content_type`) para obtener un
+          `upload_url` firmado y subir hasta 50MB; luego finalizar con
+          `POST /v1-cases/{external_case_id}/upload-complete`.
+
+        Límites de tamaño:
+        - Subida directa multipart: 6MB.
+        - Signed upload: 50MB.
+        - En todos los casos el audio debe ser procesable por STT; si supera el
+          límite procesable (por default ~25MB, configurable por backend) la API
+          responde `413` con `audio_too_large_for_processing`.
 
         Con `x-enterprise-jwt`, `external_case_id` es requerido.
         Con `x-recorder-session-token`, si se envía `external_case_id`, debe coincidir
@@ -622,11 +688,74 @@ paths:
         '403':
           description: "`external_case_id` no coincide con la sesión"
         '413':
-          description: Archivo demasiado grande
+          description: |
+            Archivo demasiado grande: supera el límite de subida directa (6MB),
+            el de signed upload (50MB) o el límite procesable por STT
+            (`audio_too_large_for_processing`).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '415':
           description: Content-Type no soportado
         '502':
           description: "No se pudo descargar `audio_url`"
+        '500':
+          description: Error interno
+
+  /v1-cases/{external_case_id}/upload-complete:
+    post:
+      tags: [Recorder cases, Enterprise cases]
+      summary: Finalizar una subida firmada (signed upload)
+      description: |
+        Paso final del flujo de signed upload. Después de crear el case en modo
+        signed (`POST /v1-cases` con `filename`/`content_type`, sin `audio_url`) y
+        de subir el archivo con `PUT` al `upload_url` devuelto, el cliente llama a
+        este endpoint para que el backend registre el audio como final, mueva el
+        case a `uploaded` y encole la transcripción.
+
+        Es idempotente: si el case ya no está en `created`, responde `200` con
+        `completed = false` y el `status` actual, sin reencolar.
+
+        Usable por Recorder Web con `x-recorder-session-token` (sólo su propio
+        `external_case_id`) o por la HCE/backend del tenant con `x-enterprise-jwt`.
+      security:
+        - SupabaseAnonApiKey: []
+          SupabaseAnonAuthorization: []
+          RecorderSessionToken: []
+        - SupabaseAnonApiKey: []
+          SupabaseAnonAuthorization: []
+          EnterpriseJwt: []
+      parameters:
+        - in: path
+          name: external_case_id
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: |
+            Audio registrado y case movido a `uploaded` (`completed = true`), o
+            case que ya no estaba en `created` y se devuelve su estado actual
+            (`completed = false`).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CaseUploadCompleteResponse'
+        '403':
+          description: El session token no puede operar sobre este case
+        '404':
+          description: Case no encontrado o audio subido no disponible en storage
+        '409':
+          description: "El case no tiene `audio_storage_path` asociado"
+        '413':
+          description: |
+            El audio subido supera el límite procesable
+            (`audio_too_large_for_processing`). El case queda en `failed`.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '500':
           description: Error interno
 
